@@ -1,0 +1,254 @@
+board = [' '] * 9
+
+print(board)
+
+
+def show_board(board):
+    print()
+    print(board[0], '|', board[1], '|', board[2])
+    print('--+---+--')
+    print(board[3], '|', board[4], '|', board[5])
+    print('--+---+--')
+    print(board[6], '|', board[7], '|', board[8])
+    print()
+
+show_board(board)
+
+
+WINNING_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+]
+
+
+def winner(board):
+    for a, b, c in WINNING_LINES:
+        if board[a] != ' ' and board[a] == board[b] == board[c]:
+            return board[a]
+
+    return None
+
+
+def empty_boxes(board):
+    return [i for i in range(9) if board[i] == ' ']
+
+
+def minimax(board, is_max_turn, alpha, beta):
+    # Check whether the game is already finished
+    win = winner(board)
+
+    if win == 'X':
+        return 1
+
+    if win == 'O':
+        return -1
+
+    if len(empty_boxes(board)) == 0:
+        return 0
+
+    # MAX turn: AI chooses the highest score
+    if is_max_turn:
+        best_score = -2
+
+        for box in empty_boxes(board):
+            board[box] = 'X'
+            score = minimax(board, False, alpha, beta)
+            board[box] = ' '
+
+            best_score = max(best_score, score)
+            alpha = max(alpha, best_score)
+
+            if beta <= alpha:
+                break
+
+        return best_score
+
+    # MIN turn: opponent chooses the lowest score
+    else:
+        best_score = 2
+
+        for box in empty_boxes(board):
+            board[box] = 'O'
+            score = minimax(board, True, alpha, beta)
+            board[box] = ' '
+
+            best_score = min(best_score, score)
+            beta = min(beta, best_score)
+
+            if beta <= alpha:
+                break
+
+        return best_score
+
+
+def best_move(board):
+    best_score = -2
+    best_box = None
+
+    for box in empty_boxes(board):
+        board[box] = 'X'
+        score = minimax(board, False, -2, 2)
+        board[box] = ' '
+
+        if score > best_score:
+            best_score = score
+            best_box = box
+
+    return best_box
+
+
+test_board = [
+    'X', 'O', 'X',
+    'O', 'X', ' ',
+    ' ', ' ', 'O'
+]
+
+show_board(test_board)
+
+move = best_move(test_board)
+
+print('AI chooses position:', move)
+
+
+def play_game():
+    board = [' '] * 9
+
+    print('You are O. The AI is X.')
+    print('Choose positions using numbers 0 to 8.')
+
+    while True:
+        # AI move
+        ai_move = best_move(board)
+        board[ai_move] = 'X'
+
+        print('\nAI chooses:', ai_move)
+        show_board(board)
+
+        if winner(board) == 'X':
+            print('AI wins!')
+            break
+
+        if len(empty_boxes(board)) == 0:
+            print('Draw!')
+            break
+
+        # Human move
+        while True:
+            try:
+                player_move = int(input('Your move (0-8): '))
+
+                if player_move in empty_boxes(board):
+                    break
+
+                print('That position is not available.')
+
+            except ValueError:
+                print('Please enter a number from 0 to 8.')
+
+        board[player_move] = 'O'
+        show_board(board)
+
+        if winner(board) == 'O':
+            print('You win!')
+            break
+
+        if len(empty_boxes(board)) == 0:
+            print('Draw!')
+            break
+
+
+from ipywidgets import Button, GridBox, Layout, Output
+from IPython.display import display, clear_output
+class Game:
+    def __init__(self, ai_player='X', human_player='O'):
+        self.board = [' '] * 9
+        self.ai_player = ai_player
+        self.human_player = human_player
+        self.buttons = [Button(description=' ', layout=Layout(width='60px', height='60px')) for _ in range(9)]
+        self.output_widget = Output()
+        self.grid = GridBox(children=self.buttons,
+                            layout=Layout(
+                                width='180px',
+                                grid_template_columns='repeat(3, 1fr)',
+                                grid_template_rows='repeat(3, 1fr)'
+                            ))
+        self.info_output = Output(layout={'border': '1px solid black', 'min_height': '30px'})
+
+        for i, button in enumerate(self.buttons):
+            button.on_click(self._on_button_click)
+            button.box_index = i
+
+        display(self.grid, self.info_output, self.output_widget)
+        self._game_start()
+
+    def _game_start(self):
+        with self.info_output:
+            clear_output()
+            print(f"You are {self.human_player}. The AI is {self.ai_player}.")
+            print("Your turn.")
+
+    def _on_button_click(self, b):
+        with self.output_widget:
+            clear_output()
+            if self.board[b.box_index] == ' ':
+                self.make_move(b.box_index, self.human_player)
+                self.update_ui()
+                if not self.check_game_over():
+                    self.ai_turn()
+                    self.update_ui()
+                    self.check_game_over()
+            else:
+                print("That position is already taken. Choose another.")
+
+    def make_move(self, index, player):
+        if self.board[index] == ' ':
+            self.board[index] = player
+            self.buttons[index].description = player
+
+    def ai_turn(self):
+        with self.info_output:
+            clear_output()
+            print(f"You are {self.human_player}. The AI is {self.ai_player}.")
+            print("AI's turn...")
+
+        ai_move = best_move(list(self.board)) # Pass a copy of the board
+        if ai_move is not None:
+            self.make_move(ai_move, self.ai_player)
+            with self.output_widget:
+                print(f"AI chooses: {ai_move}")
+
+        with self.info_output:
+            clear_output()
+            print(f"You are {self.human_player}. The AI is {self.ai_player}.")
+            print("Your turn.")
+
+    def update_ui(self):
+        for i, player in enumerate(self.board):
+            self.buttons[i].description = player
+
+    def check_game_over(self):
+        current_winner = winner(self.board)
+        if current_winner == self.ai_player:
+            with self.info_output:
+                clear_output()
+                print("AI wins!")
+            self.disable_buttons()
+            return True
+        elif current_winner == self.human_player:
+            with self.info_output:
+                clear_output()
+                print("You win!")
+            self.disable_buttons()
+            return True
+        elif len(empty_boxes(self.board)) == 0:
+            with self.info_output:
+                clear_output()
+                print("Draw!")
+            self.disable_buttons()
+            return True
+        return False
+
+    def disable_buttons(self):
+        for button in self.buttons:
+            button.disabled = True
